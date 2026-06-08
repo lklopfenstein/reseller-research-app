@@ -19,32 +19,25 @@ export async function GET(request: Request) {
 
   let browser = null;
   try {
-    const executablePath = await chromium.executablePath();
-    console.log('Launching browser at', executablePath || 'local path');
+    const exePathFn = (chromium as any).executablePath || (chromium as any).default?.executablePath;
+    const executablePath = exePathFn ? await exePathFn() : null;
     
     // Fallback to local chromium if not running on Vercel
     const options = {
-      args: chromium.args,
+      args: (chromium as any).args || (chromium as any).default?.args || [],
       executablePath: executablePath || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : '/usr/bin/google-chrome'),
       headless: true,
     };
 
-    browser = await puppeteerExtra.launch({
-      ...options,
-      ignoreHTTPSErrors: true,
-    });
+    browser = await puppeteerExtra.launch(options as any);
 
     const page = await browser.newPage();
-    
-    // Set a realistic user agent
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36');
-    
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
 
     const data = await page.evaluate(() => {
       const items = Array.from(document.querySelectorAll('.s-item__wrapper'));
-      let soldCount = 0;
-      let totalSoldPrice = 0;
+      const prices: number[] = [];
       const soldDates: string[] = [];
 
       items.forEach((item, index) => {
@@ -57,8 +50,7 @@ export async function GET(request: Request) {
           const match = priceEl.textContent.match(/\$?(\d+(?:,\d{3})*(?:\.\d{2})?)/);
           if (match) {
             const price = parseFloat(match[1].replace(/,/g, ''));
-            soldCount++;
-            totalSoldPrice += price;
+            prices.push(price);
           }
         }
         
@@ -67,9 +59,17 @@ export async function GET(request: Request) {
         }
       });
 
+      // Calculate Median instead of Mean to ignore "wildly high" bundles
+      prices.sort((a, b) => a - b);
+      let medianPrice = 0;
+      if (prices.length > 0) {
+        const mid = Math.floor(prices.length / 2);
+        medianPrice = prices.length % 2 !== 0 ? prices[mid] : (prices[mid - 1] + prices[mid]) / 2;
+      }
+
       return {
-        soldCount,
-        averagePrice: soldCount > 0 ? totalSoldPrice / soldCount : 0,
+        soldCount: prices.length,
+        averagePrice: medianPrice, // returning median but keeping property name for frontend compatibility
         recentDates: soldDates.slice(0, 10),
       };
     });
