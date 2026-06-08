@@ -30,19 +30,25 @@ function extractPrice(text: string): number | null {
 }
 
 export async function fetchArbitrageDeals(): Promise<Product[]> {
-  const url = 'https://slickdeals.net/newsearch.php?mode=frontpage&searcharea=deals&searchin=first&rss=1';
-  const feed = await parser.parseURL(url);
-
+  const urls = [
+    'https://slickdeals.net/newsearch.php?mode=frontpage&searcharea=deals&searchin=first&rss=1',
+    'https://dealnews.com/?rss=1'
+  ];
+  
   const products: Product[] = [];
 
-  for (const item of feed.items) {
-    const title = item.title || '';
-    const link = item.link || '';
-    const anyItem = item as any;
-    const content = anyItem['content:encoded'] || anyItem.content || anyItem.description || '';
+  for (const url of urls) {
+    try {
+      const feed = await parser.parseURL(url);
 
-    // Extract price from title or content
-    let buyPrice = extractPrice(title);
+      for (const item of feed.items) {
+        const title = item.title || '';
+        const link = item.link || '';
+        const anyItem = item as any;
+        const content = anyItem['content:encoded'] || anyItem.content || anyItem.description || '';
+
+        // Extract price from title or content
+        let buyPrice = extractPrice(title);
     if (!buyPrice) {
       buyPrice = extractPrice(content);
     }
@@ -99,6 +105,11 @@ export async function fetchArbitrageDeals(): Promise<Product[]> {
       sellUrl: ebaySearchUrl,
       analysis: analysis,
     });
+  }
+
+    } catch (error) {
+      console.error(`Error parsing feed ${url}:`, error);
+    }
   }
 
   // Sort by highest absolute margin first
