@@ -32,7 +32,12 @@ function extractPrice(text: string): number | null {
 export async function fetchArbitrageDeals(): Promise<Product[]> {
   const urls = [
     'https://slickdeals.net/newsearch.php?mode=frontpage&searcharea=deals&searchin=first&rss=1',
-    'https://dealnews.com/?rss=1'
+    'https://dealnews.com/?rss=1',
+    'https://bensbargains.com/rss/',
+    'https://www.spoofee.com/rss.xml',
+    'https://www.dansdeals.com/feed/',
+    'https://www.reddit.com/r/buildapcsales/new/.rss',
+    'https://clarkdeals.com/feed/'
   ];
   
   const products: Product[] = [];
