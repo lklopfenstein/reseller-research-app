@@ -54,7 +54,7 @@ export default function ProductCard({ product, index }: { product: Product; inde
           </div>
         ) : noData ? (
           <div className="metrics-error">No recent sales data found. Item may be slow-moving.</div>
-        ) : (
+        ) : product.salesMetrics ? (
           <div className="market-metrics">
             <div className="metrics-row">
               <span className="metrics-label">Avg Sold Price:</span>
@@ -71,6 +71,8 @@ export default function ProductCard({ product, index }: { product: Product; inde
               <span className="metrics-value">{product.salesMetrics.recentDates[0] || 'Unknown'}</span>
             </div>
           </div>
+        ) : (
+          <div className="metrics-error">Using algorithmic estimates. Live data unavailable.</div>
         )}
       </div>
       
