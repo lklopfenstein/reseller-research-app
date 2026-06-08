@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+import chromium from '@sparticuz/chromium-min';
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
@@ -19,13 +19,18 @@ export async function GET(request: Request) {
 
   let browser = null;
   try {
-    const exePathFn = (chromium as any).executablePath || (chromium as any).default?.executablePath;
-    const executablePath = exePathFn ? await exePathFn() : null;
+    const isLocal = process.env.NODE_ENV === 'development' || !process.env.VERCEL;
     
-    // Fallback to local chromium if not running on Vercel
+    let executablePath = null;
+    if (isLocal) {
+      executablePath = process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : '/usr/bin/google-chrome';
+    } else {
+      executablePath = await chromium.executablePath('https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.x64.tar');
+    }
+
     const options = {
-      args: (chromium as any).args || (chromium as any).default?.args || [],
-      executablePath: executablePath || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : '/usr/bin/google-chrome'),
+      args: isLocal ? [] : chromium.args,
+      executablePath,
       headless: true,
     };
 
