@@ -1,6 +1,10 @@
 import { Product } from '../services/slickdeals';
+import SalesMetrics from './SalesMetrics';
 
 export default function ProductCard({ product, index }: { product: Product; index: number }) {
+  // Use a clean version of the title for searching metrics
+  const cleanSearchQuery = product.title.replace(/\$[\d.]+/g, '').replace(/[^\w\s-]/g, '').substring(0, 40).trim();
+
   return (
     <div className="product-card animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
       <div className="product-image-wrapper">
@@ -25,6 +29,16 @@ export default function ProductCard({ product, index }: { product: Product; inde
           <div className="margin-value">+${product.margin.toFixed(2)}</div>
           <div className="margin-percent">+{product.marginPercent.toFixed(0)}%</div>
         </div>
+      </div>
+
+      <div className="market-analysis-wrapper">
+        <div className="analysis-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>
+          </svg>
+          Live Market Data
+        </div>
+        <SalesMetrics query={cleanSearchQuery} />
       </div>
       
       <div className="analysis-section">
