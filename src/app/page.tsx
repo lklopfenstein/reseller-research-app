@@ -1,5 +1,5 @@
 import { fetchArbitrageDeals } from '@/services/slickdeals';
-import ProductCard from '@/components/ProductCard';
+import Dashboard from '@/components/Dashboard';
 
 export const revalidate = 3600; // Revalidate every hour
 
@@ -33,11 +33,7 @@ export default async function Home() {
           <p>No profitable deals found at the moment. Check back later!</p>
         </div>
       ) : (
-        <div className="product-grid">
-          {products.map((product, index) => (
-            <ProductCard key={product.id} product={product} index={index} />
-          ))}
-        </div>
+        <Dashboard initialProducts={products} />
       )}
     </main>
   );

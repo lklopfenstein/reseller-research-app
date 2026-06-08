@@ -1,9 +1,19 @@
 import { Product } from '../services/slickdeals';
-import SalesMetrics from './SalesMetrics';
 
 export default function ProductCard({ product, index }: { product: Product; index: number }) {
-  // Use a clean version of the title for searching metrics
-  const cleanSearchQuery = product.title.replace(/\$[\d.]+/g, '').replace(/[^\w\s-]/g, '').substring(0, 40).trim();
+  const isAnalyzing = product.estimatedResellPrice === 0;
+  const noData = product.estimatedResellPrice === -1;
+
+  const displaySell = isAnalyzing ? 'Analyzing...' : noData ? 'Unknown' : `$${product.estimatedResellPrice.toFixed(2)}`;
+  const displayMargin = isAnalyzing ? '?' : noData ? '0' : `+$${product.margin.toFixed(2)}`;
+  const displayPercent = isAnalyzing ? '?' : noData ? '0' : `+${product.marginPercent.toFixed(0)}%`;
+
+  let velocityScore = 'Unknown';
+  let velocityColor = 'var(--text-secondary)';
+  if (product.salesMetrics) {
+    velocityScore = product.salesMetrics.soldCount > 20 ? 'High' : product.salesMetrics.soldCount > 5 ? 'Medium' : 'Low';
+    velocityColor = velocityScore === 'High' ? 'var(--success)' : velocityScore === 'Medium' ? '#f59e0b' : '#ef4444';
+  }
 
   return (
     <div className="product-card animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
@@ -22,12 +32,12 @@ export default function ProductCard({ product, index }: { product: Product; inde
         </div>
         <div className="price-box">
           <span className="price-label">Est. Sell</span>
-          <span className="price-value sell">${product.estimatedResellPrice.toFixed(2)}</span>
+          <span className="price-value sell">{displaySell}</span>
         </div>
         <div className="margin-box">
           <span className="price-label">Profit</span>
-          <div className="margin-value">+${product.margin.toFixed(2)}</div>
-          <div className="margin-percent">+{product.marginPercent.toFixed(0)}%</div>
+          <div className="margin-value">{displayMargin}</div>
+          <div className="margin-percent">{displayPercent}</div>
         </div>
       </div>
 
@@ -38,7 +48,30 @@ export default function ProductCard({ product, index }: { product: Product; inde
           </svg>
           Live Market Data
         </div>
-        <SalesMetrics query={cleanSearchQuery} />
+        {isAnalyzing ? (
+          <div className="metrics-loading">
+            <span className="pulse-dot"></span> Scraping eBay live...
+          </div>
+        ) : noData ? (
+          <div className="metrics-error">No recent sales data found. Item may be slow-moving.</div>
+        ) : (
+          <div className="market-metrics">
+            <div className="metrics-row">
+              <span className="metrics-label">Avg Sold Price:</span>
+              <span className="metrics-value">${product.salesMetrics.averagePrice.toFixed(2)}</span>
+            </div>
+            <div className="metrics-row">
+              <span className="metrics-label">Sales Velocity:</span>
+              <span className="metrics-value" style={{ color: velocityColor }}>
+                {velocityScore} ({product.salesMetrics.soldCount} recent sales)
+              </span>
+            </div>
+            <div className="metrics-row">
+              <span className="metrics-label">Last Sold:</span>
+              <span className="metrics-value">{product.salesMetrics.recentDates[0] || 'Unknown'}</span>
+            </div>
+          </div>
+        )}
       </div>
       
       <div className="analysis-section">

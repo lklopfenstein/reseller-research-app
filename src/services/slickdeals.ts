@@ -4,6 +4,7 @@ import * as cheerio from 'cheerio';
 export interface Product {
   id: string;
   title: string;
+  description: string;
   buyUrl: string;
   imageUrl: string;
   buyPrice: number;
@@ -12,7 +13,9 @@ export interface Product {
   marginPercent: number;
   sellPlatform: string;
   sellUrl: string;
+  source: string;
   analysis: string;
+  salesMetrics?: any;
 }
 
 const parser = new Parser({
@@ -46,7 +49,9 @@ export async function fetchArbitrageDeals(): Promise<Product[]> {
     try {
       const feed = await parser.parseURL(url);
 
+      let i = 0;
       for (const item of feed.items) {
+        i++;
         const title = item.title || '';
         const link = item.link || '';
         const anyItem = item as any;
@@ -54,72 +59,50 @@ export async function fetchArbitrageDeals(): Promise<Product[]> {
 
         // Extract price from title or content
         let buyPrice = extractPrice(title);
-    if (!buyPrice) {
-      buyPrice = extractPrice(content);
-    }
+        if (!buyPrice) {
+          buyPrice = extractPrice(content);
+        }
 
-    if (!buyPrice || buyPrice < 5) {
-      // Skip items without a clear price or very cheap items where arbitrage isn't worth shipping
-      continue;
-    }
+        if (!buyPrice || buyPrice < 5) {
+          // Skip items without a clear price or very cheap items where arbitrage isn't worth shipping
+          continue;
+        }
 
-    // Extract image using Cheerio
-    const $ = cheerio.load(content);
-    let imageUrl = $('img').first().attr('src');
-    if (!imageUrl) {
-      imageUrl = 'https://via.placeholder.com/300?text=No+Image';
-    }
+        // Extract image using Cheerio
+        const $ = cheerio.load(content);
+        let imageUrl = $('img').first().attr('src');
+        if (!imageUrl) {
+          imageUrl = 'https://via.placeholder.com/300?text=No+Image';
+        }
 
-    // Since we don't have a live eBay API, we estimate the original MSRP/Resell value based on typical deal discounts (approx 40-60% off)
-    // We will look for original price in the text.
-    let originalPriceMatch = title.match(/(\d+(?:\.\d{2})?)\s+Reg/i) || content.match(/Regular price\s*\$?\s*(\d+(?:\.\d{2})?)/i) || content.match(/Was\s*\$?\s*(\d+(?:\.\d{2})?)/i);
-    let resellPrice = 0;
-    
-    if (originalPriceMatch) {
-      resellPrice = parseFloat(originalPriceMatch[1]);
-    } else {
-      // If we can't find original price, estimate it's a 40% discount
-      resellPrice = buyPrice / 0.6; 
-    }
+        // Create a clean search term for eBay
+        const cleanTitle = title.replace(/\$[\d.]+/g, '').replace(/[^\w\s-]/g, '').substring(0, 50).trim();
+        const ebaySearchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(cleanTitle)}`;
 
-    // Deduct standard 15% marketplace fee + $5 shipping
-    const netResell = resellPrice * 0.85 - 5;
-    const margin = netResell - buyPrice;
-    
-    // Skip if margin is negative or too small
-    if (margin <= 0) continue;
+        const analysis = `Bought for $${buyPrice.toFixed(2)}. Live market analysis pending...`;
 
-    const marginPercent = (margin / buyPrice) * 100;
-
-    // Create a clean search term for eBay
-    const cleanTitle = title.replace(/\$[\d.]+/g, '').replace(/[^\w\s-]/g, '').substring(0, 50).trim();
-    const ebaySearchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(cleanTitle)}`;
-
-    const analysis = `Bought for $${buyPrice.toFixed(2)}. Estimated market value $${resellPrice.toFixed(2)}. After ~15% fees and $5 shipping, net return is $${netResell.toFixed(2)}. This leaves a profit of $${margin.toFixed(2)}.`;
-
-    products.push({
-      id: item.guid || link,
-      title: title,
-      buyUrl: link,
-      imageUrl: imageUrl,
-      buyPrice: buyPrice,
-      estimatedResellPrice: resellPrice,
-      margin: margin,
-      marginPercent: marginPercent,
-      sellPlatform: 'eBay',
-      sellUrl: ebaySearchUrl,
-      analysis: analysis,
-    });
-  }
-
+        products.push({
+          id: link || `${title}-${i}`,
+          title,
+          description: content.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...',
+          imageUrl,
+          buyPrice,
+          estimatedResellPrice: 0,
+          margin: 0,
+          marginPercent: 0,
+          buyUrl: link,
+          sellPlatform: 'eBay',
+          sellUrl: ebaySearchUrl,
+          source: url.includes('dealnews') ? 'DealNews' : 'Slickdeals',
+          analysis
+        });
+      }
     } catch (error) {
       console.error(`Error parsing feed ${url}:`, error);
     }
   }
 
-  // Sort by highest absolute margin first
-  products.sort((a, b) => b.margin - a.margin);
-
-  // Return top 20
-  return products.slice(0, 20);
+  // We no longer sort on the server because margins are 0.
+  // We return everything and let the client sort dynamically!
+  return products;
 }
