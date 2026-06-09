@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   }
 
   const encodedQuery = encodeURIComponent(query);
-  const url = `https://www.ebay.com/sch/i.html?_nkw=${encodedQuery}&LH_Sold=1&LH_Complete=1`;
+  const url = `https://www.ebay.com/sch/i.html?_nkw=${encodedQuery}&LH_Sold=1&LH_Complete=1&LH_ItemCondition=1000&LH_BIN=1&LH_PrefLoc=1`;
 
   let browser = null;
   try {
@@ -64,17 +64,32 @@ export async function GET(request: Request) {
         }
       });
 
-      // Calculate Median instead of Mean to ignore "wildly high" bundles
-      prices.sort((a, b) => a - b);
-      let medianPrice = 0;
-      if (prices.length > 0) {
-        const mid = Math.floor(prices.length / 2);
-        medianPrice = prices.length % 2 !== 0 ? prices[mid] : (prices[mid - 1] + prices[mid]) / 2;
+      // 3x Smarter: Statistical Outlier Rejection (IQR Method)
+      let finalAverage = 0;
+      let validPrices = prices;
+      
+      if (prices.length > 3) {
+        prices.sort((a, b) => a - b);
+        const q1Index = Math.floor(prices.length * 0.25);
+        const q3Index = Math.floor(prices.length * 0.75);
+        const q1 = prices[q1Index];
+        const q3 = prices[q3Index];
+        const iqr = q3 - q1;
+        
+        // Use a strict 1.0 multiplier instead of 1.5 to aggressively prune "Parts Only" or "Accessories"
+        const lowerBound = q1 - (1.0 * iqr);
+        const upperBound = q3 + (1.0 * iqr);
+        
+        validPrices = prices.filter(p => p >= lowerBound && p <= upperBound);
+      }
+      
+      if (validPrices.length > 0) {
+        finalAverage = validPrices.reduce((a, b) => a + b, 0) / validPrices.length;
       }
 
       return {
         soldCount: prices.length,
-        averagePrice: medianPrice, // returning median but keeping property name for frontend compatibility
+        averagePrice: finalAverage, // true market average of valid items
         recentDates: soldDates.slice(0, 10),
       };
     });

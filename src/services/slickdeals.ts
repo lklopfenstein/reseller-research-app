@@ -4,6 +4,7 @@ import * as cheerio from 'cheerio';
 export interface Product {
   id: string;
   title: string;
+  cleanTitle: string;
   description: string;
   buyUrl: string;
   imageUrl: string;
@@ -30,6 +31,26 @@ function extractPrice(text: string): number | null {
     return parseFloat(match[1]);
   }
   return null;
+}
+
+// Smart Title Cleaning Heuristics
+function cleanProductTitle(rawTitle: string): string {
+  // 1. Remove all dollar prices (e.g., $149, $149.99)
+  let title = rawTitle.replace(/\$[\d,]+(\.\d{2})?/g, ' ');
+
+  // 2. Remove common deal site promotional fluff and store names
+  const fluffRegex = /\b(free shipping|free returns|coupon|code|save|off|discount|deal|refurbished|used|open box|walmart|amazon|best buy|target|newegg|b&h|woot|price mistake|fs|ar|yvmm|ymmv)\b/gi;
+  title = title.replace(fluffRegex, ' ');
+
+  // 3. Remove punctuation and special characters that confuse eBay
+  title = title.replace(/[^\w\s-]/g, ' ');
+
+  // 4. Normalize whitespace
+  title = title.replace(/\s+/g, ' ').trim();
+
+  // 5. Limit to the first 4-5 highly relevant words for broad but accurate matching
+  const words = title.split(' ');
+  return words.slice(0, 5).join(' ');
 }
 
 export async function fetchArbitrageDeals(): Promise<Product[]> {
@@ -75,15 +96,16 @@ export async function fetchArbitrageDeals(): Promise<Product[]> {
           imageUrl = 'https://via.placeholder.com/300?text=No+Image';
         }
 
-        // Create a clean search term for eBay
-        const cleanTitle = title.replace(/\$[\d.]+/g, '').replace(/[^\w\s-]/g, '').substring(0, 50).trim();
-        const ebaySearchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(cleanTitle)}`;
+        // Create a clean search term for eBay using smart NLP heuristics
+        const cleanTitle = cleanProductTitle(title);
+        const ebaySearchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(cleanTitle)}&LH_Sold=1&LH_Complete=1&LH_ItemCondition=1000&LH_BIN=1&LH_PrefLoc=1`;
 
         const analysis = `Bought for $${buyPrice.toFixed(2)}. Live market analysis pending...`;
 
         products.push({
           id: link || `${title}-${i}`,
           title,
+          cleanTitle,
           description: content.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...',
           imageUrl,
           buyPrice,

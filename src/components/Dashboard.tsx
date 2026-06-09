@@ -15,17 +15,23 @@ export default function Dashboard({ initialProducts }: { initialProducts: Produc
         // Skip if we already analyzed it
         if (product.estimatedResellPrice > 0) return;
 
-        const cleanSearchQuery = product.title.replace(/\$[\d.]+/g, '').replace(/[^\w\s-]/g, '').substring(0, 40).trim();
-        
         try {
-          const res = await fetch(`/api/ebay-sales?q=${encodeURIComponent(cleanSearchQuery)}`);
+          // 3x Smarter: Use NLP cleaned title for precise matching
+          const res = await fetch(`/api/ebay-sales?q=${encodeURIComponent(product.cleanTitle)}`);
           if (res.ok) {
             const data = await res.json();
             if (data.soldCount > 0 && data.averagePrice > 0) {
               const resellPrice = data.averagePrice;
-              const netResell = resellPrice * 0.85 - 5; // 15% fees + $5 shipping
+              
+              // 3x Smarter: Exact eBay fees (13.25% + $0.30)
+              const ebayFee = (resellPrice * 0.1325) + 0.30;
+              
+              // 3x Smarter: Dynamic shipping estimate based on weight proxy (buyPrice)
+              const estimatedShipping = product.buyPrice > 100 ? 15 : product.buyPrice > 30 ? 8 : 4;
+              
+              const netResell = resellPrice - ebayFee - estimatedShipping;
               const margin = netResell - product.buyPrice;
-              const marginPercent = (margin / product.buyPrice) * 100;
+              const marginPercent = (margin / product.buyPrice) * 100; // ROI
               
               setProducts(currentProducts => {
                 const newProducts = currentProducts.map(p => {
@@ -35,7 +41,7 @@ export default function Dashboard({ initialProducts }: { initialProducts: Produc
                       estimatedResellPrice: resellPrice,
                       margin,
                       marginPercent,
-                      analysis: `Bought for $${p.buyPrice.toFixed(2)}. Median sold price on eBay is $${resellPrice.toFixed(2)}. After ~15% fees and $5 shipping, net return is $${netResell.toFixed(2)}. Profit: $${margin.toFixed(2)}.`,
+                      analysis: `Bought for $${p.buyPrice.toFixed(2)}. Market avg: $${resellPrice.toFixed(2)}. Fees: $${ebayFee.toFixed(2)}, Ship: $${estimatedShipping}. Net: $${netResell.toFixed(2)}. ROI: ${marginPercent.toFixed(1)}%.`,
                       salesMetrics: data
                     };
                   }
@@ -51,8 +57,11 @@ export default function Dashboard({ initialProducts }: { initialProducts: Produc
           
           // Fallback if res is not ok or no data found (fixes "Analyzing..." hang)
           const fallbackResell = product.buyPrice * 1.5; // Realistic 50% markup
-          const fallbackNet = fallbackResell * 0.85 - 5;
+          const fallbackFee = (fallbackResell * 0.1325) + 0.30;
+          const fallbackShipping = product.buyPrice > 100 ? 15 : product.buyPrice > 30 ? 8 : 4;
+          const fallbackNet = fallbackResell - fallbackFee - fallbackShipping;
           const fallbackMargin = fallbackNet - product.buyPrice;
+          const fallbackROI = (fallbackMargin / product.buyPrice) * 100;
           
           setProducts(currentProducts => {
             const newProducts = currentProducts.map(p => {
@@ -61,8 +70,8 @@ export default function Dashboard({ initialProducts }: { initialProducts: Produc
                   ...p,
                   estimatedResellPrice: fallbackResell,
                   margin: fallbackMargin,
-                  marginPercent: (fallbackMargin / p.buyPrice) * 100,
-                  analysis: `Bought for $${p.buyPrice.toFixed(2)}. (Estimated $${fallbackResell.toFixed(2)} based on standard market markup due to server limits). After fees/shipping, profit: $${fallbackMargin.toFixed(2)}.`,
+                  marginPercent: fallbackROI,
+                  analysis: `Bought for $${p.buyPrice.toFixed(2)}. (Est. $${fallbackResell.toFixed(2)} based on markup). Fees: $${fallbackFee.toFixed(2)}, Ship: $${fallbackShipping}. ROI: ${fallbackROI.toFixed(1)}%.`,
                 };
               }
               return p;
@@ -74,8 +83,11 @@ export default function Dashboard({ initialProducts }: { initialProducts: Produc
           console.error('Error fetching data for', product.title, err);
           // Same fallback on error
           const fallbackResell = product.buyPrice * 1.5;
-          const fallbackNet = fallbackResell * 0.85 - 5;
+          const fallbackFee = (fallbackResell * 0.1325) + 0.30;
+          const fallbackShipping = product.buyPrice > 100 ? 15 : product.buyPrice > 30 ? 8 : 4;
+          const fallbackNet = fallbackResell - fallbackFee - fallbackShipping;
           const fallbackMargin = fallbackNet - product.buyPrice;
+          const fallbackROI = (fallbackMargin / product.buyPrice) * 100;
           
           setProducts(currentProducts => {
             return currentProducts.map(p => {
@@ -84,8 +96,8 @@ export default function Dashboard({ initialProducts }: { initialProducts: Produc
                   ...p,
                   estimatedResellPrice: fallbackResell,
                   margin: fallbackMargin,
-                  marginPercent: (fallbackMargin / p.buyPrice) * 100,
-                  analysis: `Failed to fetch live data. Estimated market value: $${fallbackResell.toFixed(2)}.`,
+                  marginPercent: fallbackROI,
+                  analysis: `Failed to fetch live data. Estimated market value: $${fallbackResell.toFixed(2)}. ROI: ${fallbackROI.toFixed(1)}%.`,
                 };
               }
               return p;
