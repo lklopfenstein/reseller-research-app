@@ -16,7 +16,11 @@ export interface Product {
   sellUrl: string;
   source: string;
   analysis: string;
-  salesMetrics?: any;
+  salesMetrics?: {
+    soldCount: number;
+    averagePrice: number;
+    recentDates: string[];
+  };
 }
 
 const parser = new Parser({
@@ -75,7 +79,11 @@ export async function fetchArbitrageDeals(): Promise<Product[]> {
         i++;
         const title = item.title || '';
         const link = item.link || '';
-        const anyItem = item as any;
+        const anyItem = item as Parser.Item & {
+          'content:encoded'?: string;
+          content?: string;
+          description?: string;
+        };
         const content = anyItem['content:encoded'] || anyItem.content || anyItem.description || '';
 
         // Extract price from title or content

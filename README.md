@@ -1,5 +1,7 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+The dashboard refreshes its deal feeds hourly and ranks opportunities with a transparent fee, shipping, and resale estimate. It links directly to an eBay sold-items search for manual verification instead of launching a browser scraper from a serverless function.
+
 ## Getting Started
 
 First, run the development server:
